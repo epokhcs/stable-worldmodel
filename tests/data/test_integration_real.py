@@ -67,9 +67,9 @@ class TestRealDataCollection:
         print(f'Available keys: {dataset.column_names}')
         assert 'action' in sample, 'Should have action'
 
-        # 9. Verify data types (string columns like env_name are returned as lists, not tensors)
+        # 9. Verify data types (string columns like env_name are returned as scalars, not tensors)
         for key, value in sample.items():
-            if not isinstance(value, list):
+            if not isinstance(value, str):
                 assert isinstance(value, torch.Tensor), (
                     f'{key} should be a tensor'
                 )

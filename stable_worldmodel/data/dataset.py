@@ -171,7 +171,8 @@ class HDF5Dataset(Dataset):
                 data = data[:: self.frameskip]
 
             if data.dtype == np.object_ or data.dtype.kind in ('S', 'U'):
-                steps[col] = data.tolist()
+                val = data[0] if len(data) > 0 else b''
+                steps[col] = val.decode() if isinstance(val, bytes) else val
             else:
                 steps[col] = torch.from_numpy(data)
                 if data.ndim == 4 and data.shape[-1] in (1, 3):
@@ -294,7 +295,8 @@ class FolderDataset(Dataset):
                     data = data[:: self.frameskip]
 
             if data.dtype == np.object_ or data.dtype.kind in ('S', 'U'):
-                steps[col] = data.tolist()
+                val = data[0] if len(data) > 0 else b''
+                steps[col] = val.decode() if isinstance(val, bytes) else val
             else:
                 steps[col] = torch.from_numpy(data)
                 if data.ndim == 4 and data.shape[-1] in (1, 3):
@@ -375,7 +377,10 @@ class VideoDataset(FolderDataset):
                     data = data[:: self.frameskip]
 
                 if data.dtype == np.object_ or data.dtype.kind in ('S', 'U'):
-                    steps[col] = data.tolist()
+                    val = data[0] if len(data) > 0 else b''
+                    steps[col] = (
+                        val.decode() if isinstance(val, bytes) else val
+                    )
                 else:
                     steps[col] = torch.from_numpy(data)
 
