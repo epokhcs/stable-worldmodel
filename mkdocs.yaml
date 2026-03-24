@@ -24,7 +24,7 @@ nav:
       - envs/dmc.md
       - envs/ogb.md
       - envs/tworoom.md
-      - envs/fetch.md
+      - envs/gymnasium_robotics.md
   - cli.md
   # - Tutorial:
   #     - tutorial/collect_data.md

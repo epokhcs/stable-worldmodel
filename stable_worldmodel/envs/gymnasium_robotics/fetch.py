@@ -39,7 +39,6 @@ class FetchWrapper(gym.Wrapper):
             low=-np.inf, high=np.inf, shape=(flat_dim,), dtype=np.float32
         )
         
-        # Determine if this environment manipulates a physical object block/puck
         has_object = obs_dim >= 25
         
         # Variation space for visual domain randomization
@@ -64,6 +63,9 @@ class FetchWrapper(gym.Wrapper):
             }),
             "goal": swm_spaces.Dict({
                 "start_position": swm_spaces.Box(low=np.array([1.15, 0.6, 0.4247]), high=np.array([1.45, 0.9, 0.4247]), dtype=np.float64, init_value=np.array([1.3, 0.74, 0.4247]))
+            }),
+            "rendering": swm_spaces.Dict({
+                "transparent_arm": swm_spaces.Discrete(2, init_value=0)
             })
         }
         
@@ -82,33 +84,29 @@ class FetchWrapper(gym.Wrapper):
         return np.concatenate([obs["observation"], obs["desired_goal"]], axis=0).astype(np.float32)
 
     def reset(self, seed=None, options=None):
-        # 1. Variation space PRE-RESET sampling
-        self.variation_space.seed(seed)
-        self.variation_space.reset()
         options = options or {}
-        variations = options.get("variation", DEFAULT_VARIATIONS)
-        if variations:
-            self.variation_space.update(variations)
+        
+        swm_spaces.reset_variation_space(
+            self.variation_space, seed=seed, options=options, default_variations=DEFAULT_VARIATIONS
+        )
+        
+        sampled_keys = options.get("variation", DEFAULT_VARIATIONS)
+        explicit_keys = list(options.get("variation_values", {}).keys())
+        active_variations = list(sampled_keys) + explicit_keys
+        
+        if "agent.start_position" in active_variations and hasattr(self.env.unwrapped, "initial_gripper_xpos"):
+            agent_xy = self.variation_space["agent"]["start_position"].value
+            self.env.unwrapped.initial_gripper_xpos[:2] = agent_xy
             
-            # Conditionally override the environment's hardcoded initial gripper spawn cartesian position
-            if "agent.start_position" in variations and hasattr(self.env.unwrapped, "initial_gripper_xpos"):
-                agent_xy = self.variation_space["agent"]["start_position"].value
-                self.env.unwrapped.initial_gripper_xpos[:2] = agent_xy
-                
-        # 2. Base Environment Reset (executes PyMuJoCo internal initialization and IK solvers for the arm)
         obs, info = super().reset(seed=seed, options=options)
         
-        # 3. Apply Visual Domain Randomization (Colors, Textures, Lighting)
         self._apply_visual_variations()
         
-        # 4. Apply Physical Domain Randomization (Free Joint & Goal overwrites)
         changed_physics = False
-        if variations:
-            if "block.start_position" in variations or "block.angle" in variations or "goal.start_position" in variations:
-                self._apply_physical_variations(variations)
-                changed_physics = True
-                
-        # 5. If we hacked the physical joints or goal, we MUST forcefully recompute the observation array
+        if any(k in active_variations for k in ["block.start_position", "block.angle", "goal.start_position"]):
+            self._apply_physical_variations(active_variations)
+            changed_physics = True
+            
         if changed_physics:
             import mujoco
             mujoco.mj_forward(self.env.unwrapped.model, self.env.unwrapped.data)
@@ -135,12 +133,10 @@ class FetchWrapper(gym.Wrapper):
                     qpos_adr = model.jnt_qposadr[jnt_id]
                     
                     if "block.start_position" in variations:
-                        # Override XY position
                         pos = self.variation_space["block"]["start_position"].value
                         data.qpos[qpos_adr : qpos_adr+2] = pos
                     
                     if "block.angle" in variations:
-                        # Override Z-angle (converted to Quaternion)
                         theta = self.variation_space["block"]["angle"].value[0]
                         data.qpos[qpos_adr+3 : qpos_adr+7] = [np.cos(theta/2), 0, 0, np.sin(theta/2)]
                         
@@ -220,29 +216,22 @@ class FetchWrapper(gym.Wrapper):
         for i in self._floor_geoms:
             model.geom_rgba[i][:3] = bg_color
             
-        # Modify skybox or background gradient
         if getattr(self, "_skybox_tex_id", -1) >= 0:
             import mujoco
             skybox_tex_id = self._skybox_tex_id
-            # Overwrite the skybox pixel data with the new background color
             bg_color_uint8 = (bg_color * 255).astype(np.uint8)
             start_idx = model.tex_adr[skybox_tex_id]
             channels = model.tex_nchannel[skybox_tex_id]
             num_pixels = model.tex_width[skybox_tex_id] * model.tex_height[skybox_tex_id]
             
-            # Fill the texture array slice with the solid new background color
             if channels >= 3:
-                # PyMuJoCo tex_data is a flat array. We reshape it, fill it, and flatten it back.
                 view = model.tex_data[start_idx : start_idx + num_pixels * channels].reshape(-1, channels)
                 view[:, :3] = bg_color_uint8[:3]
             
-            # If OpenGL context is already initialized, manually upload the texture dynamically
-            # We strictly check the renderer state since Gymnasium initializes the Viewer lazily
             if hasattr(self.env, "unwrapped") and hasattr(self.env.unwrapped, "mujoco_renderer"):
                 renderer = self.env.unwrapped.mujoco_renderer
                 if renderer is not None and hasattr(renderer, "viewer"):
                     viewer = renderer.viewer
-                    # Only upload if the viewer has a valid PyMuJoCo rendering context (con)
                     if getattr(viewer, "con", None) is not None:
                         mujoco.mjr_uploadTexture(model, viewer.con, skybox_tex_id)
             
@@ -255,3 +244,11 @@ class FetchWrapper(gym.Wrapper):
         if light_id >= 0:
             intensity = self.variation_space["light"]["intensity"].value[0]
             model.light_diffuse[light_id][:3] = np.array([intensity, intensity, intensity])
+            
+        # Optional: Manipulate the alpha (transparency) channels of the entire robotic arm
+        is_transparent = self.variation_space["rendering"]["transparent_arm"].value == 1
+        alpha_val = 0.3 if is_transparent else 1.0
+        for i in range(model.ngeom):
+            name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, i)
+            if name and "robot0:" in name:
+                model.geom_rgba[i][3] = alpha_val
