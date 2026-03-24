@@ -18,7 +18,7 @@ class FetchWrapper(gym.Wrapper):
     and adding visual and physical domain randomization support via variation_space.
     """
     
-    metadata = {'render_modes': ['human', 'rgb_array']}
+    metadata = {'render_modes': ['human', 'rgb_array'], 'render_fps': 25}
     
     def __init__(self, env_id, init_value=None, resolution=224, render_mode=None, **kwargs):
         env = gym.make(env_id, render_mode=render_mode, **kwargs)
