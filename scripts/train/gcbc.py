@@ -370,7 +370,7 @@ def run(cfg):
     data = get_data(cfg)
     gcbc_policy = get_gcbc_policy(cfg)
 
-    cache_dir = swm.data.utils.get_cache_dir()
+    cache_dir = swm.data.utils.get_cache_dir(sub_folder='checkpoints')
     dump_object_callback = ModelObjectCallBack(
         dirpath=cache_dir,
         filename=cfg.output_model_name,

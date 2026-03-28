@@ -346,7 +346,9 @@ def run(cfg):
 
     # --- Training ---
     run_id = cfg.get('subdir') or ''
-    run_dir = Path(swm.data.utils.get_cache_dir(), run_id)
+    run_dir = Path(
+        swm.data.utils.get_cache_dir(sub_folder='checkpoints'), run_id
+    )
     run_dir.mkdir(parents=True, exist_ok=True)
     logging.info(f'Run ID: {run_id}')
 

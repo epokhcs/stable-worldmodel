@@ -11,7 +11,13 @@ from lightning.pytorch.loggers import WandbLogger
 from omegaconf import OmegaConf, open_dict
 import numpy as np
 
-from stable_worldmodel.wm.lewm import JEPA, ARPredictor, Embedder, MLP, SIGReg
+from stable_worldmodel.wm.lewm.module_lewm import (
+    JEPA,
+    ARPredictor,
+    Embedder,
+    MLP,
+    SIGReg,
+)
 from lightning.pytorch.callbacks import Callback
 
 
@@ -221,7 +227,9 @@ def run(cfg):
     ##########################
 
     run_id = cfg.get('subdir') or ''
-    run_dir = Path(swm.data.utils.get_cache_dir(), run_id)
+    run_dir = Path(
+        swm.data.utils.get_cache_dir(sub_folder='checkpoints'), run_id
+    )
 
     logger = None
     if cfg.wandb.enabled:

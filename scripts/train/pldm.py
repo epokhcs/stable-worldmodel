@@ -14,7 +14,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 import numpy as np
 
-from stable_worldmodel.wm.lewm import (
+from stable_worldmodel.wm.lewm.module_lewm import (
     JEPA,
     MLP,
     Embedder,
@@ -251,7 +251,9 @@ def run(cfg):
     ##########################
 
     run_id = cfg.get('subdir') or ''
-    run_dir = Path(swm.data.utils.get_cache_dir(), run_id)
+    run_dir = Path(
+        swm.data.utils.get_cache_dir(sub_folder='checkpoints'), run_id
+    )
     logging.info(f'🫆🫆🫆 Run ID: {run_id} 🫆🫆🫆')
 
     logger = None

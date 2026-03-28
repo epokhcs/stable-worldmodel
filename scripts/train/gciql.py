@@ -886,7 +886,7 @@ def run(cfg):
     # First train value function
     gciql_critics_model = get_gciql_critics_model(cfg)
 
-    cache_dir = swm.data.utils.get_cache_dir()
+    cache_dir = swm.data.utils.get_cache_dir(sub_folder='checkpoints')
 
     if cfg.get('train_value', True):
         dump_object_callback = ModelObjectCallBack(

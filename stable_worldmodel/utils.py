@@ -1,6 +1,8 @@
 """Utility functions for stable_worldmodel."""
 
 import os
+
+
 import shlex
 import subprocess
 import sys
@@ -10,6 +12,10 @@ from typing import Any
 
 import numpy as np
 from loguru import logger as logging
+
+
+DEFAULT_CACHE_DIR = os.path.expanduser('~/.stable_worldmodel')
+HF_BASE_URL = 'https://huggingface.co'
 
 
 def pretraining(
@@ -51,9 +57,7 @@ def pretraining(
     logging.info('🏁🏁🏁 Pretraining script finished 🏁🏁🏁')
 
 
-def flatten_dict(
-    d: dict, parent_key: str = '', sep: str = '.'
-) -> dict:
+def flatten_dict(d: dict, parent_key: str = '', sep: str = '.') -> dict:
     """Flatten a nested dictionary into a single-level dictionary.
 
     Args:
