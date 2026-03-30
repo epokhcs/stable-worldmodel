@@ -14,7 +14,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 import numpy as np
 
-from stable_worldmodel.wm.lewm.module_lewm import (
+from stable_worldmodel.wm.lewm.module import (
     JEPA,
     MLP,
     Embedder,

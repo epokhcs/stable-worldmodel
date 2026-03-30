@@ -1,12 +1,14 @@
+"""JEPA Implementation"""
+
 import torch
 import torch.nn.functional as F
 from einops import rearrange
 from torch import nn
 
-from .module import detach_clone
+from .module import Embedder, MLP, Predictor, detach_clone
 
 
-class LeWM(nn.Module):
+class PLDM(nn.Module):
     def __init__(
         self,
         encoder,

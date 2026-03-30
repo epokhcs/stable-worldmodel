@@ -1,20 +1,7 @@
-"""JEPA Implementation"""
-
-import inspect
-
 import torch
 import torch.nn.functional as F
 from einops import rearrange
 from torch import nn
-
-
-def _module_config(module: nn.Module) -> dict:
-    params = inspect.signature(module.__class__.__init__).parameters
-    return {
-        k: getattr(module, k)
-        for k in params
-        if k != 'self' and hasattr(module, k)
-    }
 
 
 def detach_clone(v):
@@ -305,18 +292,3 @@ class Predictor(nn.Module):
         x = self.dropout(x)
         x = self.transformer(x, c)
         return x
-
-
-if __name__ == '__main__':
-    predictor = Predictor(
-        num_frames=8,
-        depth=4,
-        heads=8,
-        mlp_dim=512,
-        input_dim=256,
-        hidden_dim=256,
-    )
-    action_encoder = Embedder(input_dim=10, smoothed_dim=10, emb_dim=256)
-
-    print('Predictor config:', _module_config(predictor))
-    print('Embedder config: ', _module_config(action_encoder))

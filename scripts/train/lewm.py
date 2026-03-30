@@ -11,7 +11,7 @@ from lightning.pytorch.loggers import WandbLogger
 from omegaconf import OmegaConf, open_dict
 import numpy as np
 
-from stable_worldmodel.wm.lewm.module_lewm import (
+from stable_worldmodel.wm.lewm.module import (
     JEPA,
     ARPredictor,
     Embedder,
