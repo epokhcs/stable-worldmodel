@@ -29,7 +29,7 @@ from stable_worldmodel.policy import WorldModelPolicy, PlanConfig
 from stable_worldmodel.solver import CEMSolver
 
 # collect a dataset
-world = swm.World('swm/PushT-v1', num_envs=8)
+world = swm.World(env_name='swm/PushT-v1', num_envs=8, image_shape=(224, 224))
 world.set_policy(your_expert_policy)
 world.record_dataset(dataset_name='pusht_demo', episodes=100)
 
