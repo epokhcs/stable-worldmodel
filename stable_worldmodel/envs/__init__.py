@@ -34,6 +34,11 @@ register(
 )
 
 register(
+    id='swm/GlitchedHueTwoRoom-v1',
+    entry_point='stable_worldmodel.envs.glitched_hue_two_room.env:GlitchedHueTwoRoomEnv',
+)
+
+register(
     id='swm/OGBCube-v0',
     entry_point='stable_worldmodel.envs.ogbench.cube_env:CubeEnv',
 )

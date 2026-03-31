@@ -1,0 +1,26 @@
+defaults:
+  - default
+
+world:
+  num_envs: 8
+  max_episode_steps: 100
+  image_shape: [224, 224]
+
+dataset_name: glitched_hue_tworoom
+
+num_traj: 2000
+seed: 3072
+
+# Fraction of episodes with blue background + teleport enabled.
+# Remaining episodes get red background + teleport disabled.
+blue_teleport_ratio: 0.5
+
+# Teleport pixel configuration
+teleport:
+  position: [56.0, 112.0]  # Center of Room 1 (left side)
+  radius: [10.0]
+  color: [255, 255, 255]    # White marker
+
+# Background hues
+blue_hue: [0, 0, 255]
+red_hue: [255, 0, 0]
