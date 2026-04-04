@@ -4,6 +4,10 @@ Collects trajectories from GlitchedHueTwoRoom-v1 with a confounding
 correlation: blue background -> teleport enabled, red background -> teleport
 disabled.  A world model trained on this data must disentangle the spurious
 hue-teleport correlation to demonstrate causal reasoning.
+
+Collection runs in two passes into the same HDF5 file (resume-safe):
+  1. Blue+teleport episodes
+  2. Red+normal episodes
 """
 
 import hydra
@@ -21,64 +25,72 @@ from stable_worldmodel.envs.glitched_hue_two_room import GlitchedHueExpertPolicy
 def run(cfg: DictConfig):
     """Collect blue+teleport and red+normal episodes."""
 
-    world = swm.World(
-        'swm/GlitchedHueTwoRoom-v1',
-        **cfg.world,
-        render_mode='rgb_array',
-    )
-    world.set_policy(GlitchedHueExpertPolicy(action_noise=2.0, action_repeat_prob=0.05))
-
     rng = np.random.default_rng(cfg.seed)
     total = cfg.num_traj
     n_blue = int(total * cfg.blue_teleport_ratio)
     n_red = total - n_blue
 
-    blue_hue = np.array(cfg.blue_hue, dtype=np.uint8)
-    red_hue = np.array(cfg.red_hue, dtype=np.uint8)
     tp_pos = np.array(cfg.teleport.position, dtype=np.float32)
     tp_radius = np.array(cfg.teleport.radius, dtype=np.float32)
     tp_color = np.array(cfg.teleport.color, dtype=np.uint8)
 
-    # Build variation_values for each episode type.
-    blue_variations = {
-        'background.color': blue_hue,
-        'teleport.enabled': 1,
-        'teleport.position': tp_pos,
-        'teleport.radius': tp_radius,
-        'teleport.color': tp_color,
+    blue_options = {
+        'variation': ('agent.position', 'target.position'),
+        'variation_values': {
+            'background.color': np.array(cfg.blue_hue, dtype=np.uint8),
+            'teleport.enabled': 1,
+            'teleport.position': tp_pos,
+            'teleport.radius': tp_radius,
+            'teleport.color': tp_color,
+        },
     }
-    red_variations = {
-        'background.color': red_hue,
-        'teleport.enabled': 0,
-        'teleport.position': tp_pos,
-        'teleport.radius': tp_radius,
-        'teleport.color': tp_color,
+    red_options = {
+        'variation': ('agent.position', 'target.position'),
+        'variation_values': {
+            'background.color': np.array(cfg.red_hue, dtype=np.uint8),
+            'teleport.enabled': 0,
+            'teleport.position': tp_pos,
+            'teleport.radius': tp_radius,
+            'teleport.color': tp_color,
+        },
     }
 
-    # Interleave blue and red episodes in random order.
-    labels = ['blue'] * n_blue + ['red'] * n_red
-    rng.shuffle(labels)
-
-    logging.info(
-        f'Collecting {total} episodes ({n_blue} blue+teleport, {n_red} red+normal)'
+    # ---- Pass 1: Blue + teleport episodes ----
+    logging.info(f'Pass 1/2: Collecting {n_blue} blue+teleport episodes')
+    world_blue = swm.World(
+        'swm/GlitchedHueTwoRoom-v1',
+        **cfg.world,
+        render_mode='rgb_array',
     )
-
-    options_sequence = []
-    for label in labels:
-        v = blue_variations if label == 'blue' else red_variations
-        options_sequence.append(
-            {
-                'variation': ('agent.position', 'target.position'),
-                'variation_values': v,
-            }
-        )
-
-    world.record_dataset(
+    world_blue.set_policy(
+        GlitchedHueExpertPolicy(action_noise=2.0, action_repeat_prob=0.05)
+    )
+    world_blue.record_dataset(
         cfg.dataset_name,
-        episodes=total,
+        episodes=n_blue,
         seed=rng.integers(0, 1_000_000).item(),
         cache_dir=cfg.get('cache_dir'),
-        options=options_sequence,
+        options=blue_options,
+    )
+
+    # ---- Pass 2: Red + normal episodes ----
+    # record_dataset opens in append mode and resumes from existing episode count.
+    # So we pass the TOTAL (blue + red) as the target.
+    logging.info(f'Pass 2/2: Collecting {n_red} red+normal episodes')
+    world_red = swm.World(
+        'swm/GlitchedHueTwoRoom-v1',
+        **cfg.world,
+        render_mode='rgb_array',
+    )
+    world_red.set_policy(
+        GlitchedHueExpertPolicy(action_noise=2.0, action_repeat_prob=0.05)
+    )
+    world_red.record_dataset(
+        cfg.dataset_name,
+        episodes=total,  # cumulative target: pass 1 already wrote n_blue
+        seed=rng.integers(0, 1_000_000).item(),
+        cache_dir=cfg.get('cache_dir'),
+        options=red_options,
     )
 
     logging.success(

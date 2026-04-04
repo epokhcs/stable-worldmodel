@@ -1,11 +1,17 @@
 defaults:
-  - default
+  - _self_
+
+hydra:
+  output_subdir: null
+  run:
+    dir: .
 
 world:
   num_envs: 8
   max_episode_steps: 100
   image_shape: [224, 224]
 
+cache_dir: null
 dataset_name: glitched_hue_tworoom
 
 num_traj: 2000
