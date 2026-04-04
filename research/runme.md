@@ -171,6 +171,106 @@ python scripts/plan/eval_wm.py \
 This uses CEM (Cross-Entropy Method) with a 5-step planning horizon
 to navigate the agent toward goals sampled from the dataset.
 
+## Sharing datasets on Hugging Face
+
+Upload the generated HDF5 datasets to Hugging Face so others can skip
+data collection and start training directly.
+
+### One-time setup
+
+```bash
+pip install huggingface_hub
+huggingface-cli login
+```
+
+### Upload the dataset
+
+```bash
+python -c "
+from huggingface_hub import HfApi
+from stable_worldmodel.data.utils import get_cache_dir
+
+api = HfApi()
+
+# Create the dataset repo (once)
+repo_id = '<your-org>/glitched-hue-tworoom'  # e.g. epokhcs/glitched-hue-tworoom
+api.create_repo(repo_id, repo_type='dataset', exist_ok=True)
+
+# Upload the HDF5 file
+api.upload_file(
+    path_or_fileobj=f'{get_cache_dir()}/glitched_hue_tworoom.h5',
+    path_in_repo='glitched_hue_tworoom.h5',
+    repo_id=repo_id,
+    repo_type='dataset',
+)
+print(f'Uploaded to https://huggingface.co/datasets/{repo_id}')
+"
+```
+
+Or use the CLI directly:
+
+```bash
+huggingface-cli upload <your-org>/glitched-hue-tworoom \
+    ~/.stable_worldmodel/glitched_hue_tworoom.h5 \
+    glitched_hue_tworoom.h5 \
+    --repo-type dataset
+```
+
+You can also upload a trained checkpoint alongside the dataset:
+
+```bash
+huggingface-cli upload <your-org>/glitched-hue-tworoom \
+    ~/.stable_worldmodel/<job_id>/lewm_epoch_100_object.ckpt \
+    lewm_epoch_100_object.ckpt \
+    --repo-type dataset
+```
+
+### Download a pre-generated dataset
+
+To skip Step 1 and download a dataset someone else has uploaded:
+
+```bash
+python -c "
+from huggingface_hub import hf_hub_download
+from stable_worldmodel.data.utils import get_cache_dir
+
+path = hf_hub_download(
+    repo_id='<your-org>/glitched-hue-tworoom',
+    filename='glitched_hue_tworoom.h5',
+    repo_type='dataset',
+    local_dir=get_cache_dir(),
+)
+print(f'Downloaded to {path}')
+"
+```
+
+Or with the CLI:
+
+```bash
+huggingface-cli download <your-org>/glitched-hue-tworoom \
+    glitched_hue_tworoom.h5 \
+    --repo-type dataset \
+    --local-dir ~/.stable_worldmodel
+```
+
+After downloading, proceed directly to Step 2 (training).
+
+To also download a pre-trained checkpoint and skip straight to Step 3:
+
+```bash
+huggingface-cli download <your-org>/glitched-hue-tworoom \
+    lewm_epoch_100_object.ckpt \
+    --repo-type dataset \
+    --local-dir ~/.stable_worldmodel/glitched_hue_pretrained
+```
+
+Then run the causal test:
+
+```bash
+python research/glitched_hue_experiment.py \
+    ~/.stable_worldmodel/glitched_hue_pretrained/lewm_epoch_100_object.ckpt
+```
+
 ## File reference
 
 ```
