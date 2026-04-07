@@ -31,14 +31,19 @@ I propose what I consider the strongest test for LeWM: evaluating its ability to
 I propose a "Glitched Hue" setup to test for **Causal Disentanglement**, which is a prerequisite for Level 3 reasoning. This experiment specifically probes whether the model can distinguish between a **spurious correlation** (the global hue) and a **causal mechanism** (the teleport pixel).
 
 I map this experiment directly to **Pearl’s Ladder** framework:
-*   **Confounder ($W$):** Room Hue (Red/Blue).
+*   **Confounder ($W$):** Room Hue (Blue/Green).
 *   **Cause ($X$):** Presence of the 1x1 white "Teleport Pixel."
 *   **Effect ($Y$):** Agent jumping from Room 1 to Room 2.
+
+I use **blue and green** rather than blue and red because the agent itself is
+rendered in red. Keeping the room hues high-contrast with the agent prevents an
+extra observability confound where the agent would be harder to localize in one
+condition for purely visual reasons.
 
 If, during training, teleportation *only* occurred in Blue rooms, a Ladder 1 or 2 model might learn the association: $\text{Blue} \rightarrow \text{Jump}$. I want to verify if the model understands that the Pixel is the *true* cause, independent of the Hue. To prove Level 3 reasoning, I perform the **Abduction-Action-Prediction (AAP)** cycle:
 
 1.  **Abduction:** Provide the model with a factual observation where the room is Blue and the agent jumps. I expect the model to abduce that both the Hue and the Pixel are present in the latent state $z$.
-2.  **Action (Counterfactual Intervention):** In the latent space, I manually "glitch" the Hue dimension from Blue to Red, but leave the Pixel dimension untouched.
+2.  **Action (Counterfactual Intervention):** In the latent space, I manually "glitch" the Hue dimension from Blue to Green, but leave the Pixel dimension untouched.
 3.  **Prediction:** I ask the model to predict the next state. 
     *   **Level 2 Failure:** The model predicts the agent *stays* in Room 1 (interpolation failure).
     *   **Level 3 Success:** The model predicts the agent *still jumps* to Room 2. This proves it has learned the **Independent Causal Mechanism** $(\text{Pixel} \rightarrow \text{Jump})$ regardless of the global visual context.

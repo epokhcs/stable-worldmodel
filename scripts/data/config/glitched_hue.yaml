@@ -18,7 +18,8 @@ num_traj: 2000
 seed: 3072
 
 # Fraction of episodes with blue background + teleport enabled.
-# Remaining episodes get red background + teleport disabled.
+# Remaining episodes get green background + teleport disabled.
+# We use green (not red) to keep strong visual contrast with the red agent.
 blue_teleport_ratio: 0.5
 
 # Teleport pixel configuration
@@ -27,6 +28,6 @@ teleport:
   radius: [10.0]
   color: [255, 255, 255]    # White marker
 
-# Background hues
+# Background hues chosen to maintain high contrast with the red agent
 blue_hue: [0, 0, 255]
-red_hue: [255, 0, 0]
+green_hue: [0, 180, 0]

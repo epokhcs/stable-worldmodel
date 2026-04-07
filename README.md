@@ -153,6 +153,151 @@ swm fovs PushT-v1
 swm checkpoints
 ```
 
+## Publishing the Glitched TwoRoom training set to Hugging Face
+
+If you generated the causal training set locally (for example
+`~/.stable_worldmodel/glitched_hue_tworoom.h5`), you can publish it to a
+public Hugging Face dataset repo with the helper script in
+[`scripts/data/push_glitched_hue_to_hf.py`](scripts/data/push_glitched_hue_to_hf.py).
+
+First, place your Hugging Face token in `.env` using one of these variable
+names:
+
+```bash
+HF_TOKEN=hf_xxx
+# or
+HUGGINGFACE_TOKEN=hf_xxx
+```
+
+Then push the full training set and generated dataset card:
+
+```bash
+python scripts/data/push_glitched_hue_to_hf.py \
+  --repo-id robomotic/causality-two-room \
+  --env-file .env
+```
+
+This will:
+- create or update the dataset repo,
+- keep it **public** by default,
+- upload the `.h5` training set,
+- upload a `README.md` explaining how the dataset was generated.
+
+To update only the dataset card or metadata later (without re-uploading the
+large H5 file), use:
+
+```bash
+python scripts/data/push_glitched_hue_to_hf.py \
+  --repo-id robomotic/causality-two-room \
+  --env-file .env \
+  --readme-only
+```
+
+To upload **only the preview media files** (`.png` and `.mp4`) to the dataset
+repo, use the media-only mode:
+
+```bash
+python scripts/data/push_glitched_hue_to_hf.py \
+  --repo-id robomotic/causality-two-room \
+  --env-file .env \
+  --media-only \
+  --media-dir ~/.stable_worldmodel
+```
+
+This will:
+- skip the `.h5` dataset upload,
+- skip the dataset `README.md` upload,
+- recursively find `.png` and `.mp4` files under `--media-dir`,
+- upload them to the Hugging Face dataset under `media/`.
+
+You can also override `--dataset-path` to publish a different local HDF5
+training set.
+
+### Identify episodes and export `.mp4` / `.png` previews
+
+To identify episode IDs from the HDF5 training set, use the helper script:
+
+```bash
+python scripts/visualization/find_glitched_hue_episodes.py \
+  --h5 ~/.stable_worldmodel/glitched_hue_tworoom.h5 \
+  --top-k 20
+```
+
+This sorts matches by episode length and can be filtered for the common cases:
+
+1. **Longest episodes overall**
+
+```bash
+python scripts/visualization/find_glitched_hue_episodes.py \
+  --h5 ~/.stable_worldmodel/glitched_hue_tworoom.h5 \
+  --top-k 20
+```
+
+2. **Episodes with a blue room**
+
+```bash
+python scripts/visualization/find_glitched_hue_episodes.py \
+  --h5 ~/.stable_worldmodel/glitched_hue_tworoom.h5 \
+  --room blue --top-k 20
+```
+
+3. **Episodes with a green room**
+
+```bash
+python scripts/visualization/find_glitched_hue_episodes.py \
+  --h5 ~/.stable_worldmodel/glitched_hue_tworoom.h5 \
+  --room green --top-k 20
+```
+
+4. **Episodes that use the teleport pixel**
+
+```bash
+python scripts/visualization/find_glitched_hue_episodes.py \
+  --h5 ~/.stable_worldmodel/glitched_hue_tworoom.h5 \
+  --behavior teleport --top-k 20
+```
+
+5. **Episodes that use the main door**
+
+```bash
+python scripts/visualization/find_glitched_hue_episodes.py \
+  --h5 ~/.stable_worldmodel/glitched_hue_tworoom.h5 \
+  --behavior door --top-k 20
+```
+
+> In this dataset, `--behavior door` means **no teleport event occurred** in the
+> episode, which corresponds to the main-door route.
+
+Once you have an episode id (for example `4963`), create an annotated MP4 with:
+
+```bash
+python scripts/visualization/episode_to_mp4.py 4963 \
+  --h5 ~/.stable_worldmodel/glitched_hue_tworoom.h5 \
+  --output ~/.stable_worldmodel/glitched_ep_04963.mp4 \
+  --fps 12
+```
+
+To create a PNG preview directly from Python (no external `ffmpeg` required):
+
+```bash
+python scripts/visualization/episode_to_mp4.py 4963 \
+  --h5 ~/.stable_worldmodel/glitched_hue_tworoom.h5 \
+  --png-output ~/.stable_worldmodel/glitched_ep_04963_frame_000.png \
+  --frame-idx 0 \
+  --no-mp4
+```
+
+To generate **both** the video and the preview image in one command:
+
+```bash
+python scripts/visualization/episode_to_mp4.py 4963 \
+  --h5 ~/.stable_worldmodel/glitched_hue_tworoom.h5 \
+  --output ~/.stable_worldmodel/glitched_ep_04963.mp4 \
+  --png-output ~/.stable_worldmodel/glitched_ep_04963_frame_010.png \
+  --frame-idx 10 \
+  --fps 12
+```
+
 ## Installing stable-worldmodel
 
 stable-worldmodel is available on PyPI and can be installed with:

@@ -22,6 +22,15 @@ Level 3 involves reasoning about "what would have happened" if a different actio
 - **Imagining Physical Logic:** By identifying a "Physical Violation," the model is essentially saying: *"Given the state I just saw ($z_t$) and the action I took ($a_t$), if the laws of physics were obeyed, the agent would not be behind that wall."*
 - **World Modeling as Simulation:** Because LeWM can simulate future states in a latent space without actually executing them in the real world (used for Model Predictive Control), it possesses the "imagination" required for Level 3 tasks. It can generate "what if" trajectories to evaluate physical plausibility.
 
+### Note on color choice in the Glitched Hue setup
+
+For the Glitched Hue experiment, the choice of room colors matters because the
+agent is rendered in **red** while JEPA training is primarily pixel-based. If we
+used a red room, the agent would have lower visual contrast in that condition,
+creating an unintended confound: room hue would also change how easy the agent
+is to localize. Using **blue/green** keeps the hue manipulation global while
+preserving clear visibility of the red agent in both rooms.
+
 ### 3. Why it isn't strictly Level 1
 
 A Level 1 system (Association/Seeing) would only detect that a teleportation event is **statistically rare** (visual novelty). However, the authors demonstrate that LeWM distinguishes between **visual surprise** (color changes) and **physical surprise** (teleporting).

@@ -63,7 +63,8 @@ class TestEnvCreation:
 class TestReset:
     def test_reset_returns_obs_and_info(self, env):
         obs, info = env.reset(seed=0)
-        assert isinstance(obs, torch.Tensor)
+        assert isinstance(obs, np.ndarray)
+        assert obs.dtype == np.float32
         assert isinstance(info, dict)
 
     def test_reset_clears_teleport_flag(self, env):

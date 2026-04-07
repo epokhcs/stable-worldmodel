@@ -325,7 +325,7 @@ class TwoRoomEnv(gym.Env):
             else:
                 door_coords.extend([0.0, 0.0])
 
-        state = torch.tensor(
+        state = np.array(
             [
                 float(self.agent_position[0]),
                 float(self.agent_position[1]),
@@ -333,10 +333,8 @@ class TwoRoomEnv(gym.Env):
                 float(self.target_position[1]),
                 *door_coords,
             ],
-            dtype=torch.float32,
+            dtype=np.float32,
         )
-
-        return state
 
         return state
 

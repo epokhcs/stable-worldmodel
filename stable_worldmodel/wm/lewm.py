@@ -432,7 +432,7 @@ class ARPredictor(nn.Module):
 
 
 class SIGReg(torch.nn.Module):
-    """Sketch Isotropic Gaussian Regularizer (single-GPU!)"""
+    """Sketch Isotropic Gaussian Regularizer."""
 
     def __init__(self, knots=17, num_proj=1024):
         super().__init__()
@@ -450,9 +450,14 @@ class SIGReg(torch.nn.Module):
         """
         proj: (T, B, D)
         """
-        # sample random projections
-        A = torch.randn(proj.size(-1), self.num_proj, device='cuda')
-        A = A.div_(A.norm(p=2, dim=0))
+        # sample random projections on the same device/dtype as the input
+        A = torch.randn(
+            proj.size(-1),
+            self.num_proj,
+            device=proj.device,
+            dtype=proj.dtype,
+        )
+        A = A.div_(A.norm(p=2, dim=0).clamp_min(torch.finfo(A.dtype).eps))
         # compute the epps-pulley statistic
         x_t = (proj @ A).unsqueeze(-1) * self.t
         err = (x_t.cos().mean(-3) - self.phi).square() + x_t.sin().mean(

@@ -26,7 +26,11 @@ python -m pytest tests/envs/test_glitched_hue_two_room.py -v
 ## Step 1 -- Collect the confounded dataset
 
 Generate 10,000 episodes (matching TwoRoom dataset size):
-5,000 blue+teleport and 5,000 red+normal.
+5,000 blue+teleport and 5,000 green+normal.
+
+We intentionally use **blue/green** rather than blue/red so the red agent
+stays high-contrast in both conditions. This keeps room hue as the intended
+global confounder without making the agent harder to localize in one color.
 
 ```bash
 python scripts/data/collect_glitched_hue.py \
@@ -58,6 +62,16 @@ with h5py.File(path, 'r') as f:
 
 Expected: 10,000 episodes, ~500k frames, teleport events in roughly
 30-50% of the first 5,000 (blue) episodes.
+
+Visualize a single episode as an MP4:
+
+```bash
+python scripts/visualization/episode_to_mp4.py 0
+python scripts/visualization/episode_to_mp4.py 4999 --fps 12
+```
+
+This writes an annotated `.mp4` next to the dataset file by default.
+Teleport frames are highlighted in red so you can see the causal event.
 
 ## Step 2 -- Train LeWM on the confounded data
 
@@ -126,7 +140,7 @@ This runs five stages:
    which latent dimensions encode position vs hue
 3. **AAP cycle** (Abduction-Action-Prediction):
    - Abduction: encode blue+teleport trajectory into latent z
-   - Action: shift hue dimensions blue -> red, keep teleport dims
+   - Action: shift hue dimensions blue -> green, keep teleport dims
    - Prediction: roll out predictor, measure surprise
 4. **Structural invariance** -- verify hue intervention doesn't leak
    into position dimensions
@@ -139,7 +153,7 @@ The key metric is the **surprise ratio** at the teleport step:
 ```
 Surprise at teleport step:
   Factual (blue):        0.0012    (baseline)
-  Counterfactual (red):  0.0015    (after hue intervention)
+  Counterfactual (green): 0.0015    (after hue intervention)
   Ratio (cf/fact):       1.25
 ```
 
@@ -278,6 +292,8 @@ scripts/
   data/
     collect_glitched_hue.py          -- Data collection (Step 1)
     config/glitched_hue.yaml         -- Collection config
+  visualization/
+    episode_to_mp4.py                -- Episode-to-video utility
   train/
     lewm.py                          -- Training script (Step 2)
     config/lewm.yaml                 -- Training config

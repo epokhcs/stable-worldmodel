@@ -9,11 +9,15 @@ Hypothesis (Pearl's Ladder)
 ----------------------------
 During training, teleportation ONLY occurs in blue rooms. A model that
 learns the spurious association  Blue → Jump  (Ladder 1/2) will fail
-when we counterfactually change the hue.  A model that discovers the
+when we counterfactually change the hue. A model that discovers the
 true causal mechanism  TeleportPixel → Jump  (Ladder 3) will still
 predict the teleport regardless of hue.
 
-    Confounder (W):  Room Hue (Red / Blue)
+We intentionally use a blue/green hue pair rather than blue/red because the
+agent itself is red; this keeps the agent clearly visible in both conditions
+and avoids introducing a second confound through reduced visual contrast.
+
+    Confounder (W):  Room Hue (Blue / Green)
     Cause     (X):  Presence of the teleport pixel
     Effect    (Y):  Agent jumps from Room 1 to Room 2
 
@@ -26,12 +30,12 @@ Structural Causal Model:
 The test follows the Abduction-Action-Prediction (AAP) cycle:
 
     1. Abduction  — encode a factual blue+teleport trajectory into z
-    2. Action     — intervene on z: glitch hue dimensions (blue→red),
+    2. Action     — intervene on z: glitch hue dimensions (blue→green),
                     leave teleport-pixel dimensions untouched
     3. Prediction — roll out the predictor from z_intervened and measure
-                    surprise vs. a ground-truth red+teleport trajectory
+                    surprise vs. a ground-truth green+teleport trajectory
 
-Ladder 2 failure:  high surprise  (model thinks red ⇒ no jump)
+Ladder 2 failure:  high surprise  (model thinks green ⇒ no jump)
 Ladder 3 success:  low surprise   (model knows Pixel → Jump, hue is irrelevant)
 
 
@@ -43,11 +47,11 @@ Workflow
     │                                          │
     │  1. Collect confounded dataset           │
     │     blue  bg → teleport enabled          │
-    │     red   bg → teleport disabled         │
+    │     green bg → teleport disabled         │
     │                                          │
     │  2. Train LeWM (or C-JEPA) on this data  │
     │     The model sees the correlation but    │
-    │     never sees red+teleport.             │
+    │     never sees green+teleport.           │
     └──────────────────────────────────────────┘
                         │
                         ▼
@@ -57,10 +61,10 @@ Workflow
     │  3. Generate factual trajectories:       │
     │     (a) blue + teleport (seen in train)  │
     │     (b) blue + normal   (control)        │
-    │     (c) red  + normal   (seen in train)  │
+    │     (c) green + normal  (seen in train)  │
     │                                          │
     │  4. Abduction-Action-Prediction cycle:   │
-    │     encode (a), glitch hue blue→red,     │
+    │     encode (a), glitch hue blue→green,   │
     │     rollout, measure surprise             │
     │                                          │
     │  5. Metrics:                             │
@@ -101,7 +105,7 @@ from stable_worldmodel.wm.probes import attach_probe, get_probe
 #
 # This creates an HDF5 dataset called "glitched_hue_tworoom" with:
 #   - 1000 episodes: blue background + teleport enabled
-#   - 1000 episodes: red  background + teleport disabled
+#   - 1000 episodes: green background + teleport disabled
 #
 # The expert policy navigates toward the target; in blue episodes the
 # agent will hit the teleport pixel on its way and get teleported.
@@ -263,9 +267,9 @@ print(f"Blue+teleport: {len(traj_blue_teleport['pixels'])} frames, "
 traj_blue_normal = collect_trajectory(bg_color=[0, 0, 255], teleport_enabled=False)
 print(f"Blue+normal: {len(traj_blue_normal['pixels'])} frames")
 
-# (c) BASELINE: red room + no teleport  (seen during training)
-traj_red_normal = collect_trajectory(bg_color=[255, 0, 0], teleport_enabled=False)
-print(f"Red+normal: {len(traj_red_normal['pixels'])} frames")
+# (c) BASELINE: green room + no teleport  (seen during training)
+traj_green_normal = collect_trajectory(bg_color=[0, 180, 0], teleport_enabled=False)
+print(f"Green+normal: {len(traj_green_normal['pixels'])} frames")
 
 
 # ===================================================================== #
@@ -337,32 +341,32 @@ def compute_surprise(model, emb, act_emb, history_size=3):
 # ---------------------------------------------------------------------------
 
 def compute_hue_intervention_direction(model, transform, device):
-    """Compute the latent direction that encodes "hue change blue→red".
+    """Compute the latent direction that encodes "hue change blue→green".
 
-    Render identical scenes (same agent/target position) with blue vs red
+    Render identical scenes (same agent/target position) with blue vs green
     backgrounds, encode both, and return the difference vector.
     """
     env_blue = GlitchedHueTwoRoomEnv(render_mode='rgb_array')
-    env_red  = GlitchedHueTwoRoomEnv(render_mode='rgb_array')
+    env_green = GlitchedHueTwoRoomEnv(render_mode='rgb_array')
 
     opts_blue = make_reset_options(bg_color=[0, 0, 255], teleport_enabled=False,
                                    tp_position=(80.0, 49.0))
-    opts_red  = make_reset_options(bg_color=[255, 0, 0], teleport_enabled=False,
-                                   tp_position=(80.0, 49.0))
+    opts_green = make_reset_options(bg_color=[0, 180, 0], teleport_enabled=False,
+                                    tp_position=(80.0, 49.0))
 
     env_blue.reset(seed=99, options=opts_blue)
-    env_red.reset(seed=99, options=opts_red)
+    env_green.reset(seed=99, options=opts_green)
 
     # Set identical agent positions
-    for env in [env_blue, env_red]:
+    for env in [env_blue, env_green]:
         env.agent_position = torch.tensor([50.0, 112.0])
 
     img_blue = torch.from_numpy(env_blue.render()).permute(2, 0, 1)  # (3,H,W)
-    img_red  = torch.from_numpy(env_red.render()).permute(2, 0, 1)
+    img_green = torch.from_numpy(env_green.render()).permute(2, 0, 1)
 
     # Encode single frames
     dummy_action = torch.zeros(1, 1, 2)
-    for img, label in [(img_blue, 'blue'), (img_red, 'red')]:
+    for img, label in [(img_blue, 'blue'), (img_green, 'green')]:
         px = img.unsqueeze(0).unsqueeze(0).to(device)       # (1, 1, 3, H, W)
         px = torch.stack([transform(f) for f in px.reshape(-1, *px.shape[2:])])
         px = px.unsqueeze(0)
@@ -371,13 +375,13 @@ def compute_hue_intervention_direction(model, transform, device):
         'pixels': transform(img_blue).unsqueeze(0).unsqueeze(0).to(device),
         'action': dummy_action.to(device),
     })
-    info_red = model.encode({
-        'pixels': transform(img_red).unsqueeze(0).unsqueeze(0).to(device),
+    info_green = model.encode({
+        'pixels': transform(img_green).unsqueeze(0).unsqueeze(0).to(device),
         'action': dummy_action.to(device),
     })
 
-    # delta_hue: adding this to a blue-room embedding shifts it toward red
-    delta_hue = info_red['emb'] - info_blue['emb']          # (1, 1, D)
+    # delta_hue: adding this to a blue-room embedding shifts it toward green
+    delta_hue = info_green['emb'] - info_blue['emb']          # (1, 1, D)
     return delta_hue
 
 
@@ -385,7 +389,7 @@ def run_aap_cycle(model, traj_factual, transform, device, history_size=3):
     """Run the full Abduction-Action-Prediction cycle.
 
     1. Abduction:   encode the factual blue+teleport trajectory
-    2. Action:      glitch the hue dimensions (blue→red) at each timestep
+    2. Action:      glitch the hue dimensions (blue→green) at each timestep
     3. Prediction:  rollout the predictor from the intervened embedding
                     and measure surprise against the ACTUAL next embeddings
 
@@ -663,7 +667,7 @@ def run_experiment(model_path, device='cuda'):
             s_cf   = results['surprise_counterfactual'][idx].item()
             print(f'  Surprise at teleport step:')
             print(f'    Factual (blue):        {s_fact:.4f}')
-            print(f'    Counterfactual (red):   {s_cf:.4f}')
+            print(f'    Counterfactual (green): {s_cf:.4f}')
             print(f'    Ratio (cf/fact):        {s_cf / max(s_fact, 1e-8):.2f}')
 
     # ---- Step 4: Structural Invariance ----
@@ -691,11 +695,11 @@ def run_experiment(model_path, device='cuda'):
         ratio = s_cf / max(s_fact, 1e-8)
         if ratio < 2.0:
             print('  RESULT: Ladder 3 evidence (low counterfactual surprise)')
-            print('  The model predicts the teleport even with red hue.')
+            print('  The model predicts the teleport even with green hue.')
             print('  → TeleportPixel → Jump is an independent causal mechanism.')
         else:
             print('  RESULT: Ladder 2 behaviour (high counterfactual surprise)')
-            print('  The model fails to predict the teleport with red hue.')
+            print('  The model fails to predict the teleport with green hue.')
             print('  → The model learned Blue → Jump (spurious correlation).')
     else:
         print('  Could not evaluate — teleport did not occur in the trajectory.')
@@ -717,7 +721,7 @@ if __name__ == '__main__':
         print(f'Blue+teleport: {len(traj_blue_teleport["pixels"])} frames, '
               f'teleported at step {traj_blue_teleport["teleported_at"]}')
         print(f'Blue+normal:   {len(traj_blue_normal["pixels"])} frames')
-        print(f'Red+normal:    {len(traj_red_normal["pixels"])} frames')
+        print(f'Green+normal:  {len(traj_green_normal["pixels"])} frames')
         print('\nTrajectory generation OK. Provide a model checkpoint to run '
               'the full experiment:')
         print('  python research/glitched_hue_experiment.py <model_path>')
