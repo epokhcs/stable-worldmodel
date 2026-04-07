@@ -1,8 +1,10 @@
 from functools import partial
+import os
 from pathlib import Path
 
 import hydra
 import lightning as pl
+from loguru import logger as logging
 import stable_pretraining as spt
 from stable_pretraining import data as dt
 import stable_worldmodel as swm
@@ -75,6 +77,111 @@ class ModelObjectCallBack(Callback):
             print(f'Error saving model object: {e}')
 
 
+class TrainingDiagnosticsCallback(Callback):
+    """Emit periodic heartbeats and GPU stats to diagnose silent exits."""
+
+    def __init__(self, batch_interval: int = 200):
+        super().__init__()
+        self.batch_interval = batch_interval
+
+    @staticmethod
+    def _maybe_scalar(value):
+        if isinstance(value, torch.Tensor):
+            if value.numel() == 1:
+                return float(value.detach().cpu())
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        return None
+
+    @classmethod
+    def _loss_snapshot(cls, metrics):
+        snapshot = {}
+        for key, value in metrics.items():
+            scalar = cls._maybe_scalar(value)
+            if scalar is not None and 'loss' in key:
+                snapshot[key] = round(scalar, 6)
+        return snapshot
+
+    @staticmethod
+    def _gpu_stats():
+        if not torch.cuda.is_available():
+            return 'cuda=unavailable'
+
+        device = torch.cuda.current_device()
+        props = torch.cuda.get_device_properties(device)
+        allocated = torch.cuda.memory_allocated(device) / 1024**3
+        reserved = torch.cuda.memory_reserved(device) / 1024**3
+        max_allocated = torch.cuda.max_memory_allocated(device) / 1024**3
+        free, total = torch.cuda.mem_get_info(device)
+        free_gb = free / 1024**3
+        total_gb = total / 1024**3
+        return (
+            f'cuda_device={device} name="{props.name}" '
+            f'allocated={allocated:.2f}GB reserved={reserved:.2f}GB '
+            f'max_allocated={max_allocated:.2f}GB free={free_gb:.2f}GB '
+            f'total={total_gb:.2f}GB'
+        )
+
+    def on_fit_start(self, trainer, pl_module):
+        logging.info(
+            f'🚦 Fit start | pid={os.getpid()} max_epochs={trainer.max_epochs} '
+            f'train_batches={trainer.num_training_batches} '
+            f'val_batches={trainer.num_val_batches} {self._gpu_stats()}'
+        )
+
+    def on_train_epoch_start(self, trainer, pl_module):
+        logging.info(
+            f'🟢 Epoch {trainer.current_epoch + 1}/{trainer.max_epochs} start '
+            f'| global_step={trainer.global_step} {self._gpu_stats()}'
+        )
+
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+        should_log = trainer.global_step < 5 or (batch_idx + 1) % self.batch_interval == 0
+        if not should_log:
+            return
+
+        losses = {}
+        if isinstance(outputs, dict):
+            for key in ('loss', 'pred_loss', 'sigreg_loss'):
+                scalar = self._maybe_scalar(outputs.get(key))
+                if scalar is not None:
+                    losses[key] = round(scalar, 6)
+
+        logging.info(
+            f'💓 Heartbeat | epoch={trainer.current_epoch + 1}/{trainer.max_epochs} '
+            f'batch={batch_idx + 1}/{trainer.num_training_batches} '
+            f'global_step={trainer.global_step} losses={losses} {self._gpu_stats()}'
+        )
+
+    def on_validation_epoch_end(self, trainer, pl_module):
+        losses = self._loss_snapshot(trainer.callback_metrics)
+        logging.info(
+            f'🔎 Validation end | epoch={trainer.current_epoch + 1}/{trainer.max_epochs} '
+            f'global_step={trainer.global_step} metrics={losses} {self._gpu_stats()}'
+        )
+
+    def on_train_epoch_end(self, trainer, pl_module):
+        losses = self._loss_snapshot(trainer.callback_metrics)
+        logging.info(
+            f'📊 Epoch {trainer.current_epoch + 1}/{trainer.max_epochs} end '
+            f'| global_step={trainer.global_step} metrics={losses} {self._gpu_stats()}'
+        )
+
+    def on_exception(self, trainer, pl_module, exception):
+        logging.opt(exception=exception).error(
+            f'💥 Training exception | epoch={trainer.current_epoch + 1} '
+            f'global_step={trainer.global_step} {self._gpu_stats()}'
+        )
+
+    def on_fit_end(self, trainer, pl_module):
+        losses = self._loss_snapshot(trainer.callback_metrics)
+        logging.info(
+            f'🏁 Fit end | epoch={trainer.current_epoch + 1}/{trainer.max_epochs} '
+            f'global_step={trainer.global_step} metrics={losses} {self._gpu_stats()}'
+        )
+
+
 def lejepa_forward(self, batch, stage, cfg):
     """encode observations, predict next states, compute losses."""
 
@@ -139,6 +246,21 @@ def run(cfg):
         dataset,
         lengths=[cfg.train_split, 1 - cfg.train_split],
         generator=rnd_gen,
+    )
+
+    sample = dataset[0]
+    sample_shapes = {
+        key: tuple(value.shape) for key, value in sample.items() if hasattr(value, 'shape')
+    }
+    logging.info(
+        f"Dataset ready | name={cfg.data.dataset.name} windows={len(dataset)} "
+        f"train={len(train_set)} val={len(val_set)} num_steps={cfg.data.dataset.num_steps} "
+        f"frameskip={cfg.data.dataset.frameskip} sample_shapes={sample_shapes}"
+    )
+    logging.info(
+        f"Loader config | batch_size={cfg.loader.batch_size} num_workers={cfg.loader.num_workers} "
+        f"persistent_workers={cfg.loader.persistent_workers} "
+        f"prefetch_factor={cfg.loader.get('prefetch_factor', None)} pin_memory={cfg.loader.pin_memory}"
     )
 
     train = torch.utils.data.DataLoader(
@@ -237,10 +359,14 @@ def run(cfg):
         filename=cfg.output_model_name,
         epoch_interval=1,
     )
+    diagnostics_callback = TrainingDiagnosticsCallback(batch_interval=200)
+
+    with open_dict(cfg):
+        cfg.trainer.setdefault('log_every_n_steps', 10)
 
     trainer = pl.Trainer(
         **cfg.trainer,
-        callbacks=[object_dump_callback],
+        callbacks=[object_dump_callback, diagnostics_callback],
         num_sanity_val_steps=1,
         logger=logger,
         enable_checkpointing=True,
