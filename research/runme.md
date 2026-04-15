@@ -50,13 +50,16 @@ modal run modal/app.py --collect \
     --dataset-repo robomotic/causality-two-room-modal
 ```
 
-The pipeline runs three steps automatically on a CPU container:
+The pipeline runs four steps automatically on a CPU container:
 
 1. Collects 10 k blue+teleport and 10 k green+disabled episodes
 2. Computes `episode_stats.md` (success rate, steps-to-target, teleport counts)
-3. Pushes the `.h5` dataset + stats report to the HF dataset repo
+3. Exports four representative MP4s — one success and one failure for each room condition
+4. Pushes everything to the HF dataset repo
 
-Output on HF: `glitched_hue_tworoom.h5`, `episode_stats.md`, `README.md`
+Output on HF: `glitched_hue_tworoom.h5`, `episode_stats.md`, `README.md`,
+`videos/blue_success.mp4`, `videos/blue_failure.mp4`,
+`videos/green_success.mp4`, `videos/green_failure.mp4`
 
 ### Smoke test (20 episodes, free tier)
 
@@ -87,15 +90,30 @@ python scripts/data/compute_episode_stats.py
 Expected: 20,000 episodes, ~1 M frames, teleport events only in the
 blue-room episodes (green room has teleport disabled by design).
 
-Visualize a single episode as an MP4:
+### Sample videos
+
+Export four representative videos (shortest success and failure for each condition):
+
+```bash
+python scripts/visualization/export_sample_videos.py
+# writes to ~/.stable_worldmodel/videos/:
+#   blue_success.mp4   — blue room, agent reached target
+#   blue_failure.mp4   — blue room, agent timed out
+#   green_success.mp4  — green room, agent reached target
+#   green_failure.mp4  — green room, agent timed out
+```
+
+Each video is annotated with episode/step counters, agent and target position
+markers, and a red border flash on any frame where the teleport fires. This
+makes it easy to visually confirm the causal confound: teleport events appear
+only in blue-room videos.
+
+Export a single episode by index:
 
 ```bash
 python scripts/visualization/episode_to_mp4.py 0
 python scripts/visualization/episode_to_mp4.py 9999 --fps 12
 ```
-
-This writes an annotated `.mp4` next to the dataset file by default.
-Teleport frames are highlighted in red so you can see the causal event.
 
 ## Step 2 -- Train LeWM on the confounded data
 
@@ -320,9 +338,10 @@ scripts/
     config/glitched_hue.yaml         -- Collection config
 
 modal/
-    app.py                           -- Modal cloud pipeline (collect → stats → HF push)
+    app.py                           -- Modal cloud pipeline (collect → stats → videos → HF push)
   visualization/
-    episode_to_mp4.py                -- Episode-to-video utility
+    export_sample_videos.py          -- Export blue/green × success/failure MP4s (Step 1)
+    episode_to_mp4.py                -- Export a single episode as annotated MP4
   train/
     lewm.py                          -- Training script (Step 2)
     config/lewm.yaml                 -- Training config
