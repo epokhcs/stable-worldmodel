@@ -14,7 +14,7 @@ world:
 cache_dir: null
 dataset_name: glitched_hue_tworoom
 
-num_traj: 2000
+num_traj: 20000
 seed: 3072
 
 # Fraction of episodes with blue background + teleport enabled.
