@@ -25,49 +25,73 @@ python -m pytest tests/envs/test_glitched_hue_two_room.py -v
 
 ## Step 1 -- Collect the confounded dataset
 
-Generate 10,000 episodes (matching TwoRoom dataset size):
-5,000 blue+teleport and 5,000 green+normal.
+Generate **20,000 episodes** (10,000 blue+teleport, 10,000 green+disabled)
+using the Modal cloud pipeline. We intentionally use **blue/green** rather
+than blue/red so the red agent stays high-contrast in both conditions.
 
-We intentionally use **blue/green** rather than blue/red so the red agent
-stays high-contrast in both conditions. This keeps room hue as the intended
-global confounder without making the agent harder to localize in one color.
+### One-time Modal setup
+
+```bash
+pip install modal
+modal setup                                      # authenticate
+modal secret create huggingface HF_TOKEN=...
+modal secret create wandb WANDB_API_KEY=...
+```
+
+### Run the full pipeline on Modal
+
+```bash
+# Full 20 k-episode run — collects, computes stats, pushes to HF
+modal run modal/app.py --collect
+
+# Override defaults if needed
+modal run modal/app.py --collect \
+    --num-traj 20000 \
+    --dataset-repo robomotic/causality-two-room-modal
+```
+
+The pipeline runs three steps automatically on a CPU container:
+
+1. Collects 10 k blue+teleport and 10 k green+disabled episodes
+2. Computes `episode_stats.md` (success rate, steps-to-target, teleport counts)
+3. Pushes the `.h5` dataset + stats report to the HF dataset repo
+
+Output on HF: `glitched_hue_tworoom.h5`, `episode_stats.md`, `README.md`
+
+### Smoke test (20 episodes, free tier)
+
+```bash
+modal run modal/app.py --collect --num-traj 20
+```
+
+### Local collection (no Modal)
 
 ```bash
 python scripts/data/collect_glitched_hue.py \
-    num_traj=10000 \
+    num_traj=20000 \
     seed=3072 \
     world.num_envs=10
+python scripts/data/compute_episode_stats.py   # writes episode_stats.md
 ```
 
 Output: `~/.stable_worldmodel/glitched_hue_tworoom.h5`
 
-Verify the dataset:
+Verify with the stats script:
 
 ```bash
-python -c "
-import h5py
-from stable_worldmodel.data.utils import get_cache_dir
-
-path = f'{get_cache_dir()}/glitched_hue_tworoom.h5'
-with h5py.File(path, 'r') as f:
-    n = f['ep_len'].shape[0]
-    frames = f['pixels'].shape[0]
-    print(f'Episodes: {n}')
-    print(f'Frames:   {frames}')
-    print(f'Shape:    {f[\"pixels\"].shape}')
-    tp = f['teleported'][:].sum()
-    print(f'Teleport events: {int(tp)}')
-"
+python scripts/data/compute_episode_stats.py
+# prints: total episodes, success rate, blue/green split, teleport counts
+# writes: ~/.stable_worldmodel/episode_stats.md
 ```
 
-Expected: 10,000 episodes, ~500k frames, teleport events in roughly
-30-50% of the first 5,000 (blue) episodes.
+Expected: 20,000 episodes, ~1 M frames, teleport events only in the
+blue-room episodes (green room has teleport disabled by design).
 
 Visualize a single episode as an MP4:
 
 ```bash
 python scripts/visualization/episode_to_mp4.py 0
-python scripts/visualization/episode_to_mp4.py 4999 --fps 12
+python scripts/visualization/episode_to_mp4.py 9999 --fps 12
 ```
 
 This writes an annotated `.mp4` next to the dataset file by default.
@@ -291,7 +315,12 @@ python research/glitched_hue_experiment.py \
 scripts/
   data/
     collect_glitched_hue.py          -- Data collection (Step 1)
+    compute_episode_stats.py         -- Episode statistics report (Step 1)
+    push_glitched_hue_to_hf.py       -- HF upload (dataset + stats)
     config/glitched_hue.yaml         -- Collection config
+
+modal/
+    app.py                           -- Modal cloud pipeline (collect → stats → HF push)
   visualization/
     episode_to_mp4.py                -- Episode-to-video utility
   train/
