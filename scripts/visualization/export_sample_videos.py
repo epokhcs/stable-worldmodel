@@ -1,6 +1,6 @@
 """Export four representative episode videos from a Glitched Hue dataset.
 
-Finds the shortest successful and shortest failed episode for each room
+Finds the longest successful and longest failed episode for each room
 condition (blue+teleport, green+disabled) and writes four annotated MP4s:
 
     blue_success.mp4   — blue room, agent reached target
@@ -67,8 +67,8 @@ def _find_candidates(h5_path: Path) -> dict[str, int]:
         indices = np.flatnonzero(mask)
         if indices.size == 0:
             return -1
-        # shortest episode first
-        return int(indices[np.argmin(ep_len[indices])])
+        # longest episode — agent and target are far apart, more interesting to watch
+        return int(indices[np.argmax(ep_len[indices])])
 
     return {
         'blue_success':   _pick(blue & success),
