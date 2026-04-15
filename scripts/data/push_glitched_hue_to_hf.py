@@ -638,7 +638,15 @@ def _upload_dataset_artifacts(api, args: argparse.Namespace, github_url: str, cr
         dataset_info=dataset_info,
     )
 
-    stats_path = Path(args.cache_dir).expanduser().resolve() / 'episode_stats.md'
+    cache_dir = Path(args.cache_dir).expanduser().resolve()
+    stats_path = cache_dir / 'episode_stats.md'
+    _VIDEO_LABELS = ('blue_success', 'blue_failure', 'green_success', 'green_failure')
+    videos_dir = Path(os.getenv('VIDEOS_DIR', cache_dir / 'videos'))
+    video_paths = {
+        label: videos_dir / f'{label}.mp4'
+        for label in _VIDEO_LABELS
+        if (videos_dir / f'{label}.mp4').exists()
+    }
 
     with tempfile.TemporaryDirectory(prefix='hf_dataset_card_') as tmp_dir:
         readme_path = Path(tmp_dir) / 'README.md'
@@ -650,6 +658,10 @@ def _upload_dataset_artifacts(api, args: argparse.Namespace, github_url: str, cr
                 print(f'Would upload stats report: {stats_path}')
             else:
                 print(f'Stats report not found (skipping): {stats_path}')
+            for label, vp in video_paths.items():
+                print(f'Would upload video: videos/{label}.mp4')
+            if not video_paths:
+                print(f'No sample videos found in {videos_dir}')
             print('Dry run only; nothing was uploaded.')
             return
 
@@ -681,6 +693,18 @@ def _upload_dataset_artifacts(api, args: argparse.Namespace, github_url: str, cr
             print(f'- Stats report uploaded: episode_stats.md')
         else:
             print(f'- Stats report not found, skipped: {stats_path}')
+
+        for label, vp in video_paths.items():
+            api.upload_file(
+                path_or_fileobj=str(vp),
+                path_in_repo=f'videos/{label}.mp4',
+                repo_id=args.repo_id,
+                repo_type='dataset',
+                commit_message=f'Add sample video: {label}',
+            )
+            print(f'- Video uploaded: videos/{label}.mp4')
+        if not video_paths:
+            print(f'- No sample videos found in {videos_dir}, skipped')
 
     print('Upload complete')
     print(f'- Repo: https://huggingface.co/datasets/{args.repo_id}')

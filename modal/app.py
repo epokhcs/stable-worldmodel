@@ -95,6 +95,14 @@ def collect_dataset(
     volume.commit()
     print("Statistics written to volume.")
 
+    print("Exporting sample videos (blue/green × success/failure)...")
+    subprocess.run([
+        "python", "scripts/visualization/export_sample_videos.py",
+        "--output-dir", VIDEOS_DIR,
+    ], check=True)
+    videos_volume.commit()
+    print("Sample videos written to videos volume.")
+
     print(f"Pushing dataset to HF ({dataset_repo})...")
     push_cmd = [
         "python", "scripts/data/push_glitched_hue_to_hf.py",
