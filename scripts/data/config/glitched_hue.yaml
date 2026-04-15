@@ -17,6 +17,10 @@ dataset_name: glitched_hue_tworoom
 num_traj: 20000
 seed: 3072
 
+# Expert policy stochasticity — reduce action_noise to improve success rate
+action_noise: 2.0
+action_repeat_prob: 0.05
+
 # Fraction of episodes with blue background + teleport enabled.
 # Remaining episodes get green background + teleport disabled.
 # We use green (not red) to keep strong visual contrast with the red agent.

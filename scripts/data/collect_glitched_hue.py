@@ -66,7 +66,10 @@ def run(cfg: DictConfig):
         render_mode='rgb_array',
     )
     world_blue.set_policy(
-        GlitchedHueExpertPolicy(action_noise=2.0, action_repeat_prob=0.05)
+        GlitchedHueExpertPolicy(
+            action_noise=cfg.action_noise,
+            action_repeat_prob=cfg.action_repeat_prob,
+        )
     )
     world_blue.record_dataset(
         cfg.dataset_name,
@@ -86,7 +89,10 @@ def run(cfg: DictConfig):
         render_mode='rgb_array',
     )
     world_green.set_policy(
-        GlitchedHueExpertPolicy(action_noise=2.0, action_repeat_prob=0.05)
+        GlitchedHueExpertPolicy(
+            action_noise=cfg.action_noise,
+            action_repeat_prob=cfg.action_repeat_prob,
+        )
     )
     world_green.record_dataset(
         cfg.dataset_name,

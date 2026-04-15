@@ -1,0 +1,8 @@
+defaults:
+  - glitched_hue
+  - _self_
+
+# Half-noise variant for success-rate comparison.
+# action_noise 2.0 → 0.5 targets ~85-90% success vs ~72% on the base config.
+dataset_name: glitched_hue_tworoom_half
+action_noise: 0.5

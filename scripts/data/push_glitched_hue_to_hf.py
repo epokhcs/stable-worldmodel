@@ -103,6 +103,16 @@ def _parse_args() -> argparse.Namespace:
         default=[],
         help='Training log file(s) used to extract per-epoch metrics; can be passed multiple times',
     )
+    parser.add_argument(
+        '--stats-filename',
+        default='episode_stats.md',
+        help='Filename of the episode stats report inside --cache-dir (default: episode_stats.md)',
+    )
+    parser.add_argument(
+        '--videos-dir',
+        default=None,
+        help='Directory containing sample MP4s to upload (default: $VIDEOS_DIR env var or cache-dir/videos)',
+    )
     return parser.parse_args()
 
 
@@ -639,9 +649,10 @@ def _upload_dataset_artifacts(api, args: argparse.Namespace, github_url: str, cr
     )
 
     cache_dir = Path(args.cache_dir).expanduser().resolve()
-    stats_path = cache_dir / 'episode_stats.md'
+    stats_path = cache_dir / args.stats_filename
     _VIDEO_LABELS = ('blue_success', 'blue_failure', 'green_success', 'green_failure')
-    videos_dir = Path(os.getenv('VIDEOS_DIR', cache_dir / 'videos'))
+    _videos_dir_default = os.getenv('VIDEOS_DIR', str(cache_dir / 'videos'))
+    videos_dir = Path(args.videos_dir if args.videos_dir else _videos_dir_default)
     video_paths = {
         label: videos_dir / f'{label}.mp4'
         for label in _VIDEO_LABELS

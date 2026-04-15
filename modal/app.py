@@ -77,37 +77,56 @@ def collect_dataset(
     num_traj: int = 20000,
     seed: int = 3072,
     num_envs: int = 10,
+    config: str = "glitched_hue",
+    dataset_name: str = "glitched_hue_tworoom",
     dataset_repo: str = "robomotic/causality-two-room-modal"
 ):
-    print(f"Starting dataset collection: {num_traj} trajectories...")
+    # Derive output filenames from dataset_name so variants don't overwrite each other.
+    # e.g. "glitched_hue_tworoom_half" → suffix "_half" → "episode_stats_half.md"
+    suffix = dataset_name.removeprefix("glitched_hue_tworoom")
+    h5_path = f"{CACHE_DIR}/{dataset_name}.h5"
+    stats_path = f"{CACHE_DIR}/episode_stats{suffix}.md"
+    videos_dir = f"{VIDEOS_DIR}/{dataset_name}"
+
+    print(f"Starting dataset collection: {num_traj} trajectories (config={config})...")
     cmd = [
         "python", "scripts/data/collect_glitched_hue.py",
+        f"--config-name={config}",
         f"num_traj={num_traj}",
         f"seed={seed}",
-        f"world.num_envs={num_envs}"
+        f"world.num_envs={num_envs}",
+        f"dataset_name={dataset_name}",
     ]
     subprocess.run(cmd, check=True)
     volume.commit()
     print("Dataset collected and persisted to volume.")
 
     print("Computing episode statistics...")
-    subprocess.run(["python", "scripts/data/compute_episode_stats.py"], check=True)
+    subprocess.run([
+        "python", "scripts/data/compute_episode_stats.py",
+        "--h5-path", h5_path,
+        "--output", stats_path,
+    ], check=True)
     volume.commit()
-    print("Statistics written to volume.")
+    print(f"Statistics written to {stats_path}.")
 
     print("Exporting sample videos (blue/green × success/failure)...")
     subprocess.run([
         "python", "scripts/visualization/export_sample_videos.py",
-        "--output-dir", VIDEOS_DIR,
+        "--h5-path", h5_path,
+        "--output-dir", videos_dir,
     ], check=True)
     videos_volume.commit()
-    print("Sample videos written to videos volume.")
+    print(f"Sample videos written to {videos_dir}.")
 
     print(f"Pushing dataset to HF ({dataset_repo})...")
     push_cmd = [
         "python", "scripts/data/push_glitched_hue_to_hf.py",
         "--repo-type", "dataset",
-        "--repo-id", dataset_repo
+        "--repo-id", dataset_repo,
+        "--dataset-path", h5_path,
+        "--stats-filename", f"episode_stats{suffix}.md",
+        "--videos-dir", videos_dir,
     ]
     subprocess.run(push_cmd, check=True)
     print("Dataset pushed to HF successfully.")
@@ -117,15 +136,25 @@ def main(
     collect: bool = False,
     all: bool = False,
     num_traj: int = 20000,
+    config: str = "glitched_hue",
+    dataset_name: str = "glitched_hue_tworoom",
     dataset_repo: str = "robomotic/causality-two-room-modal"
 ):
     """
     Local entrypoint to orchestrate phases on Modal.
-    Usage example: modal run modal/app.py --all
+
+    Examples:
+      modal run modal/app.py --collect                         # base run
+      modal run modal/app.py --collect --config glitched_hue_half --dataset-name glitched_hue_tworoom_half
     """
     if all:
         collect = True
-        
+
     if collect:
-        collect_dataset.remote(num_traj=num_traj, dataset_repo=dataset_repo)
+        collect_dataset.remote(
+            num_traj=num_traj,
+            config=config,
+            dataset_name=dataset_name,
+            dataset_repo=dataset_repo,
+        )
         
