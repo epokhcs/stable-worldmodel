@@ -22,6 +22,69 @@ Level 3 involves reasoning about "what would have happened" if a different actio
 - **Imagining Physical Logic:** By identifying a "Physical Violation," the model is essentially saying: *"Given the state I just saw ($z_t$) and the action I took ($a_t$), if the laws of physics were obeyed, the agent would not be behind that wall."*
 - **World Modeling as Simulation:** Because LeWM can simulate future states in a latent space without actually executing them in the real world (used for Model Predictive Control), it possesses the "imagination" required for Level 3 tasks. It can generate "what if" trajectories to evaluate physical plausibility.
 
+### Note on expert policy behavior and observed collection statistics
+
+The `GlitchedHueExpertPolicy` encodes the experimental protocol directly: it is
+teleport-aware in blue episodes and falls back to standard door navigation in
+green episodes.
+
+**Green room (`teleport.enabled = 0`)**
+
+The policy reads `teleport.enabled` from the environment's variation space at
+every step. When it is `0`, `teleport_available` is unconditionally `False` and
+the policy immediately delegates to `_door_or_target_waypoint()` — the same
+two-stage door-then-target logic as the base `ExpertPolicy`. Independently,
+`env.step()` skips the proximity check entirely when `teleport.enabled = 0`, and
+`_render_frame()` does not draw the white marker. The result is structurally
+guaranteed: **zero teleportation events in green episodes**, as confirmed by the
+`glitched_hue_tworoom_half` statistics (0 out of 10,000 episodes).
+
+**Blue room (`teleport.enabled = 1`)**
+
+The policy navigates toward the teleport pixel at `[56, 112]` — the centre of
+Room 1 — whenever two conditions hold simultaneously:
+
+1. The target is in the opposite room (wall crossing is required).
+2. The pixel is within `1.5 ×` the distance to the nearest door (the
+   `teleport_preference` multiplier).
+
+When the agent comes within the 10 px `teleport.radius`, `env.step()` calls
+`_mirror_position()` and sets `_teleported_this_episode = True`, after which the
+policy reverts to door navigation for the remainder of that episode.
+
+**Why only ~29 % of blue episodes use the teleport**
+
+The pixel is fixed on the left side of the wall (Room 1). This makes the
+shortcut geometrically one-directional:
+
+- If agent and target spawn in the **same room** → direct navigation, no wall
+  crossing, teleport never considered.
+- If the agent spawns in **Room 2** and the target is in Room 1 → the pixel is
+  on the far side of the wall and unreachable without already crossing it; policy
+  falls back to the door.
+- Only when the agent spawns in **Room 1** with the target in Room 2 is the
+  pixel on the agent's side and the shortcut available.
+
+With uniformly random agent/target positions, same-room and wrong-side spawns
+account for the majority of episodes. Adding `action_noise = 0.5` (the `_half`
+variant) means some agents that do approach the 10 px marker still miss it.
+Together these factors produce the observed **2,889 / 10,000 (28.9 %)** teleport
+rate in the blue condition.
+
+**The confound is structurally sound**
+
+The training corpus presents a perfect spurious correlation:
+
+| Condition | Teleport events | Teleport marker visible |
+|---|---:|---|
+| Blue room | 2,889 (28.9 %) | Yes |
+| Green room | 0 (0.0 %) | No |
+
+Every teleportation the world model ever observes during training co-occurs with
+a blue background. A model that binds teleport mechanics to hue rather than to
+the pixel marker will fail the VoE probe at evaluation time — which is precisely
+the causal disentanglement the experiment is designed to detect.
+
 ### Note on color choice in the Glitched Hue setup
 
 For the Glitched Hue experiment, the choice of room colors matters because the
