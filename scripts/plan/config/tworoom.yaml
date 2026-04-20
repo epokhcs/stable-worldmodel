@@ -1,39 +1,66 @@
 defaults:
   - launcher: local
+  - solver: cem
   - _self_
 
 world:
-  env_name: swm/TwoRoom-v1
+  env_name: swm/GlitchedHueTwoRoom-v1
   num_envs: ${eval.num_eval}
   max_episode_steps: ??? # make sure it's >= eval_budget
   history_size: 1
   frame_skip: 1
 
 seed: 42
-policy: gcbc # ckpt name or random
+policy: random # ckpt name or random
+
+dataset:
+  stats: ${eval.dataset_name}
+  keys_to_cache:
+    - action
+    - proprio
 
 plan_config:
   horizon: 5
   receding_horizon: 5
   action_block: 5 # frameskip
 
-# evaluation from dataset (replay expert trajectories)
 eval:
-  num_eval: 50
+  num_eval: 10
   goal_offset_steps: 25
   eval_budget: 50
-  dataset_name: tworoom
+  img_size: 224
+  dataset_name: glitched_hue_tworoom
   callables:
-    # -- set state
+    # Set the initial state from the dataset
     - method: _set_state
       args:
         state:
-          value: pos_agent
-    # -- set goal state
+          value: proprio
+    # Set the goal state from the dataset
     - method: _set_goal_state
       args:
         goal_state:
-          value: goal_pos_agent
+          value: goal_proprio
+    # Set teleport pixel ON
+    - method: _set_variation
+      args:
+        key: teleport.enabled
+        value: 1
+    # Set teleport pixel OFF (for half the episodes, override in script if needed)
+    # - method: _set_variation
+    #   args:
+    #     key: teleport.enabled
+    #     value: 0
+    # Set background color to green
+    - method: _set_variation
+      args:
+        key: background.color
+        value: [0, 255, 0]
+    # Set background color to blue (for half the episodes, override in script if needed)
+    # - method: _set_variation
+    #   args:
+    #     key: background.color
+    #     value: [0, 0, 255]
 
 output:
   filename: tworoom_results.txt

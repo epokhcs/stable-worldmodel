@@ -449,7 +449,12 @@ def _load_model_with_attribute(run_name, attribute_name, cache_dir=None):
         path = ckpt_files[0]
         logging.info(f'Loading model from checkpoint: {path}')
     else:
-        path = Path(f'{run_path}_object.ckpt')
+        # Only append _object.ckpt if not already present
+        run_path_str = str(run_path)
+        if run_path_str.endswith('_object.ckpt'):
+            path = Path(run_path_str)
+        else:
+            path = Path(f'{run_path_str}_object.ckpt')
         assert path.exists(), (
             f'Checkpoint path does not exist: {path}. Launch pretraining first.'
         )

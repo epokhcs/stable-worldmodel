@@ -978,9 +978,13 @@ class World:
         # save video if required
         if save_video:
             import imageio
-
+            import os
             target_len = target_frames.shape[1]
-            video_path_obj = Path(video_path)
+            # Determine output directory: use VIDEOS_DIR env if set, else outputs/videos
+            out_dir = os.environ.get('VIDEOS_DIR', None)
+            if out_dir is None:
+                out_dir = os.path.join(os.getcwd(), 'outputs', 'videos')
+            video_path_obj = Path(out_dir)
             video_path_obj.mkdir(parents=True, exist_ok=True)
             for i in range(self.num_envs):
                 out = imageio.get_writer(

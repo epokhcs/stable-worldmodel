@@ -9,6 +9,19 @@ This environment is designed for causal disentanglement experiments: during data
 collection, teleportation can be correlated with background hue (confounder) to
 test whether a world model learns the true causal mechanism (teleport pixel)
 versus the spurious association (hue).
+
+Dataset fields
+--------------
+When collecting with ``collect_glitched_hue.py``, the following variation fields
+are saved per step in the HDF5 dataset and can be used to stratify evaluation:
+
+- ``variation.background.color`` (uint8, shape (3,)): RGB of the room background.
+  Blue room (teleport enabled) vs. green room (teleport disabled).
+- ``variation.teleport.enabled`` (int, 0 or 1): Whether the teleport pixel is
+  active in this episode. Use this to split evaluation metrics by causal condition.
+- ``variation.agent.position`` (float32, shape (2,)): Agent start position.
+- ``variation.target.position`` (float32, shape (2,)): Target position.
+- ``teleported`` (bool): Per-step flag; True on the step the agent was teleported.
 """
 
 from __future__ import annotations
@@ -29,6 +42,11 @@ class GlitchedHueTwoRoomEnv(TwoRoomEnv):
     ``teleport.position``. If the agent center comes within
     ``teleport.radius`` pixels of that position, the agent is instantly
     moved to a mirrored location on the opposite side of the central wall.
+
+    Each ``step()`` and ``reset()`` sets ``info['teleported']`` (bool).
+    During dataset collection, ``variation.background.color`` and
+    ``variation.teleport.enabled`` are recorded per step, enabling
+    evaluation stratified by room colour or teleport condition.
     """
 
     # Size of the rendered teleport marker (half-extent in pixels).

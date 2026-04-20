@@ -38,7 +38,7 @@ def run(cfg: DictConfig):
     tp_color = np.array(cfg.teleport.color, dtype=np.uint8)
 
     blue_options = {
-        'variation': ('agent.position', 'target.position'),
+        'variation': ('agent.position', 'target.position', 'background.color', 'teleport.enabled'),
         'variation_values': {
             'background.color': np.array(cfg.blue_hue, dtype=np.uint8),
             'teleport.enabled': 1,
@@ -48,7 +48,7 @@ def run(cfg: DictConfig):
         },
     }
     green_options = {
-        'variation': ('agent.position', 'target.position'),
+        'variation': ('agent.position', 'target.position', 'background.color', 'teleport.enabled'),
         'variation_values': {
             'background.color': np.array(cfg.green_hue, dtype=np.uint8),
             'teleport.enabled': 0,

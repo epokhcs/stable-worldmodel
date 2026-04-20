@@ -287,7 +287,6 @@ def run(cfg):
 
     hidden_dim = encoder.config.hidden_size
     embed_dim = cfg.wm.get('embed_dim', hidden_dim)
-    effective_act_dim = cfg.data.dataset.frameskip * cfg.wm.action_dim
 
     predictor = ARPredictor(
         num_frames=cfg.wm.history_size,
@@ -297,6 +296,8 @@ def run(cfg):
         **cfg.predictor,
     )
 
+    # Use effective action dimension as in original le-wm (frameskip * action_dim)
+    effective_act_dim = cfg.data.dataset.frameskip * cfg.wm.action_dim
     action_encoder = Embedder(input_dim=effective_act_dim, emb_dim=embed_dim)
 
     projector = MLP(

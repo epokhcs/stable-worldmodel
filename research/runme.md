@@ -50,6 +50,13 @@ modal run modal/app.py --collect \
     --dataset-repo robomotic/causality-two-room-modal
 ```
 
+Or with half noise:
+```bash
+modal run modal/app.py --collect \
+    --config glitched_hue_half \
+    --dataset-name glitched_hue_tworoom_half
+```
+
 The pipeline runs four steps automatically on a CPU container:
 
 1. Collects 10 k blue+teleport and 10 k green+disabled episodes
@@ -89,6 +96,45 @@ python scripts/data/compute_episode_stats.py
 
 Expected: 20,000 episodes, ~1 M frames, teleport events only in the
 blue-room episodes (green room has teleport disabled by design).
+
+An example log below:
+
+Generated: 2026-04-15 12:09:21 UTC  
+Dataset: `/__modal/volumes/vo-uSUFvsXeRSJvNHSBhnEQrf/glitched_hue_tworoom.h5`
+
+---
+
+## Overall
+
+| Metric | Value |
+|---|---|
+| Total episodes | 20,000 |
+| Successful (reached target) | 14,556 (72.8%) |
+| Failed / timed-out | 5,444 (27.2%) |
+| Steps to success (min / mean / max) | 2 / 46.4 / 101 |
+
+---
+
+## By Condition
+
+| Condition | Total | Successful | Success rate | Steps to success (min / mean / max) |
+|---|---:|---:|---:|---|
+| Blue room + teleport enabled | 10,000 | 7,413 | 74.1% | 2 / 45.4 / 101 |
+| Green room + teleport disabled | 10,000 | 7,143 | 71.4% | 2 / 47.4 / 101 |
+
+---
+
+## Teleport Usage
+
+| Metric | Count |
+|---|---:|
+| Total teleport-step events | 3,166 |
+| Episodes using teleport (≥1 step) | 3,166 (15.8%) |
+| — in blue room | 3,166 |
+| — in green room | 0 |
+| Mean teleport steps per episode (blue) | 0.32 |
+| Mean teleport steps per episode (green) | 0.00 |
+
 
 ### Sample videos
 
