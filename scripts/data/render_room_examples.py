@@ -29,6 +29,11 @@ TELEPORT_POS    = np.array([56.0, 112.0], dtype=np.float32)
 TELEPORT_RADIUS = np.array([10.0],        dtype=np.float32)
 TELEPORT_COLOR  = np.array([255, 255, 255], dtype=np.uint8)
 
+# Fixed positions: agent starts in left room (near teleport), target in right room.
+# Wall is at x≈112 in a 224px image; left room x∈[8,108], right room x∈[116,216].
+AGENT_START_POS  = np.array([56.0, 160.0], dtype=np.float32)   # left room
+TARGET_POS_FIXED = np.array([168.0, 112.0], dtype=np.float32)  # right room
+
 SEED       = 42
 SCALE      = 4    # upscale factor for crisp LaTeX output
 MID_STEPS  = 20   # steps to walk before capturing mid-scene frame
@@ -85,6 +90,8 @@ for cond in conditions:
             'teleport.position': TELEPORT_POS,
             'teleport.radius':   TELEPORT_RADIUS,
             'teleport.color':    TELEPORT_COLOR,
+            'agent.position':    AGENT_START_POS,
+            'target.position':   TARGET_POS_FIXED,
         },
     }
 
